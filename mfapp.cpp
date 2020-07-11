@@ -29,41 +29,6 @@ void Log(const char* format, ...) {
     printf("\n");
 }
 
-class MediaEngineNeedKeyNotify : public IMFMediaEngineNeedKeyNotify {
-    long m_cRef;
-
-public:
-    MediaEngineNeedKeyNotify() : m_cRef(0) {}
-
-    STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
-        if (__uuidof(IMFMediaEngineNeedKeyNotify) == riid) {
-            *ppv = static_cast<IMFMediaEngineNeedKeyNotify*>(this);
-        } else {
-            *ppv = nullptr;
-            return E_NOINTERFACE;
-        }
-        AddRef();
-        return S_OK;
-    }
-
-    STDMETHODIMP_(ULONG) AddRef() {
-        return InterlockedIncrement(&m_cRef);
-    }
-
-    STDMETHODIMP_(ULONG) Release() {
-        LONG cRef = InterlockedDecrement(&m_cRef);
-        if (cRef == 0) {
-            delete this;
-        }
-        return cRef;
-    }
-
-    void STDMETHODCALLTYPE NeedKey(_In_reads_bytes_opt_(cb) const BYTE *initData, _In_ DWORD cb) {
-        Log("Needkey, len: %d", cb);
-        Log("If we got here, then the key system appears to be working on this version of windows - press ESC to quit");
-    }
-};
-
 class MediaEngineNotify : public IMFMediaEngineNotify, IMFMediaEngineEMENotify {
     long m_cRef;
 
@@ -107,6 +72,42 @@ public:
 
     void STDMETHODCALLTYPE WaitingForKey(void) {
         Log("BigMediaEngineNotify: WaitingForKey");
+    }
+};
+
+class MediaEngineNeedKeyNotify : public IMFMediaEngineNeedKeyNotify {
+    long m_cRef;
+
+public:
+    MediaEngineNeedKeyNotify() : m_cRef(0) {}
+
+    STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
+        if (__uuidof(IMFMediaEngineNeedKeyNotify) == riid) {
+            *ppv = static_cast<IMFMediaEngineNeedKeyNotify*>(this);
+        }
+        else {
+            *ppv = nullptr;
+            return E_NOINTERFACE;
+        }
+        AddRef();
+        return S_OK;
+    }
+
+    STDMETHODIMP_(ULONG) AddRef() {
+        return InterlockedIncrement(&m_cRef);
+    }
+
+    STDMETHODIMP_(ULONG) Release() {
+        LONG cRef = InterlockedDecrement(&m_cRef);
+        if (cRef == 0) {
+            delete this;
+        }
+        return cRef;
+    }
+
+    void STDMETHODCALLTYPE NeedKey(_In_reads_bytes_opt_(cb) const BYTE *initData, _In_ DWORD cb) {
+        Log("Needkey, len: %d", cb);
+        Log("If we got here, then the key system appears to be working on this version of windows - press ESC to quit");
     }
 };
 
