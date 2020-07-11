@@ -175,7 +175,7 @@ HRESULT CreateProtectedPlaybackSession() {
         return hr;
     }
 
-    // Create CDM store directories in CWD.
+    // Create CDM store directories in current working directory (or "cwd").
     const uint32_t CWD_BUFFER_LEN = 512;
     wchar_t cwd[CWD_BUFFER_LEN];
     ZeroMemory((void *)cwd, CWD_BUFFER_LEN * sizeof(wchar_t));
