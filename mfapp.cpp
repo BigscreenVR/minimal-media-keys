@@ -235,7 +235,7 @@ HRESULT CreateProtectedPlaybackSession() {
 
     mediaEngineEME->Release();
 
-    return hr;
+    return S_OK;
 }
 
 void CleanUp() {
@@ -334,9 +334,7 @@ VOID ErrorExit(LPSTR lpszMessage) {
 
 bool KeyEventProc(KEY_EVENT_RECORD ker) {
     if (!ker.bKeyDown && ker.wVirtualKeyCode == VK_ESCAPE) { // "esc"
-        if (!onExit) {
-            onExit = true;
-        }
+        onExit = true;
         return true;
     }
     return false;
