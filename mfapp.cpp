@@ -67,11 +67,11 @@ public:
 
     // IMFMediaEngineEMENotify
     void STDMETHODCALLTYPE Encrypted(_In_reads_bytes_opt_(cb) const BYTE *pbInitData, _In_ DWORD cb, _In_ BSTR bstrInitDataType) {
-        Log("BigMediaEngineNotify: Encrypted %ls", bstrInitDataType);
+        Log("MediaEngineNotify: Encrypted %ls", bstrInitDataType);
     }
 
     void STDMETHODCALLTYPE WaitingForKey(void) {
-        Log("BigMediaEngineNotify: WaitingForKey");
+        Log("MediaEngineNotify: WaitingForKey");
     }
 };
 
@@ -291,7 +291,7 @@ int main() {
 
     _beginthread(MediaThread, 0, nullptr);
 
-    Log("ESC to quit");
+    Log("Getting media keys -- press ESC to quit");
     
     INPUT_RECORD irInBuf[128];
     bool result = false;
