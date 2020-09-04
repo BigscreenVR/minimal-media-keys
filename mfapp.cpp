@@ -155,14 +155,19 @@ HRESULT CreateProtectedPlaybackSession() {
         return hr;
     }
 
-    DWORD MEDIA_ENGINE_FLAGS = 0; //MF_MEDIA_ENGINE_REAL_TIME_MODE | MF_MEDIA_ENGINE_DISABLE_LOCAL_PLUGINS;
-    if (FAILED(hr = factory->CreateInstance(MEDIA_ENGINE_FLAGS, attributes, &mediaEngine))) {
-        Log("Failed to Create MediaEngine Instance 0x%x", hr);
+    if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE_IE11))) {
+        Log("Failed to set MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE 0x%x", hr);
         return hr;
     }
 
-    if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE_IE_EDGE))) {
-        Log("Failed to set MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE 0x%x", hr);
+    if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_COMPATIBILITY_MODE_WIN10))) {
+        Log("Failed to set MF_MEDIA_ENGINE_COMPATIBILITY_MODE 0x%x", hr);
+        return hr;
+    }
+
+    DWORD MEDIA_ENGINE_FLAGS = 0; // MF_MEDIA_ENGINE_REAL_TIME_MODE | MF_MEDIA_ENGINE_DISABLE_LOCAL_PLUGINS;
+    if (FAILED(hr = factory->CreateInstance(0, attributes, &mediaEngine))) {
+        Log("Failed to Create MediaEngine Instance 0x%x", hr);
         return hr;
     }
 
@@ -175,21 +180,32 @@ HRESULT CreateProtectedPlaybackSession() {
     // Query for the class factory that allows us to create media keys.
     //
     // https://docs.microsoft.com/en-us/windows/win32/api/mfmediaengine/nn-mfmediaengine-imfmediaengineclassfactory2
-    IMFMediaEngineClassFactory2 *keyFactory = nullptr;
-    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactory2), (void**)&keyFactory))) {
+    
+
+    IMFMediaEngineClassFactoryEx *keyFactoryEx = nullptr;
+    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactoryEx), (void**)&keyFactoryEx))) {
+        Log("Failed to query interface for IMFMediaEngineClassFactoryEx: %.2x", hr);
+        return hr;
+    }
+    IMFMediaEngineClassFactory2 *keyFactory2 = nullptr;
+    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactory2), (void**)&keyFactory2))) {
         Log("Failed to query interface for IMFMediaEngineClassFactory2: %.2x", hr);
         return hr;
     }
-
+    IMFMediaEngineClassFactory3 *keyFactory3 = nullptr;
+    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactory3), (void**)&keyFactory3))) {
+        Log("Failed to query interface for IMFMediaEngineClassFactory3: %.2x", hr);
+        return hr;
+    }
     // Create CDM store directories in current working directory (or "cwd").
     const uint32_t CWD_BUFFER_LEN = 512;
     wchar_t cwd[CWD_BUFFER_LEN];
     ZeroMemory((void *)cwd, CWD_BUFFER_LEN * sizeof(wchar_t));
     DWORD cwdLen = GetCurrentDirectoryW(CWD_BUFFER_LEN, (LPWSTR)cwd);
     std::wstring cwdCdmStore(cwd, std::wstring::traits_type::length(cwd));
-    cwdCdmStore.append(L"\\cdm");
+    cwdCdmStore.append(L"\\cdm\\");
     std::wstring cwdPrivateCdmStores(cwd, cwdLen);
-    cwdPrivateCdmStores.append(L"\\cdm_private");
+    cwdPrivateCdmStores.append(L"\\cdm_private\\");
 
     BSTR defaultCdmStorePath = SysAllocStringLen(cwdCdmStore.c_str(), cwdCdmStore.size());
     BSTR inprivateCdmStorePath = SysAllocStringLen(cwdPrivateCdmStores.c_str(), cwdPrivateCdmStores.size());
@@ -209,14 +225,23 @@ HRESULT CreateProtectedPlaybackSession() {
     }
 
     // Create the key session with the given content decryption modules.
-    BSTR keySystem = L"com.microsoft.playready";
+    BSTR keySystem = L"com.microsoft.playready.recommended";
+    
     IMFMediaKeys *prKeys = nullptr;
-    if (FAILED(hr = keyFactory->CreateMediaKeys2(keySystem, defaultCdmStorePath, inprivateCdmStorePath, &prKeys))) {
-        Log("Failed to create media keys: 0x%X", hr);
-        return hr;
-    }
+    hr = keyFactoryEx->CreateMediaKeys(keySystem, L"C:\\Users\\David\\AppData\\Local\\cdm\\", &prKeys);
 
-    keyFactory->Release();
+    
+    IMFMediaKeys *prKeys2 = nullptr;
+    if (FAILED(hr = keyFactory2->CreateMediaKeys2(keySystem, defaultCdmStorePath, inprivateCdmStorePath, &prKeys2))) {
+        Log("Failed to create media keys: 0x%X", hr);
+        //return hr;
+    }
+    IMFMediaKeySystemAccess *keyAccess = nullptr;
+    hr = keyFactory3->CreateMediaKeySystemAccess(keySystem, nullptr, 0, &keyAccess);
+    IMFMediaKeys2 *prKeys3 = nullptr;
+    hr = keyAccess->CreateMediaKeys(nullptr, &prKeys3);
+
+    //keyFactory->Release();
 
     BSTR url = SysAllocStringLen(streamManifestUrl.data(), streamManifestUrl.size());
     hr = mediaEngine->SetSource(url);
@@ -234,9 +259,9 @@ HRESULT CreateProtectedPlaybackSession() {
     }
 
     // TODO: Is this the best place to do this?
-    if (FAILED(hr = mediaEngineEME->SetMediaKeys(prKeys))) {
-        Log("Failed to set media keys 0x%X", hr);
-    }
+    //if (FAILED(hr = mediaEngineEME->SetMediaKeys(prKeys))) {
+    //    Log("Failed to set media keys 0x%X", hr);
+    //}
 
     mediaEngineEME->Release();
 
