@@ -143,6 +143,11 @@ HRESULT CreateProtectedPlaybackSession() {
         return hr;
     }
 
+    if (FAILED(hr = attributes->SetUnknown(MF_MEDIA_ENGINE_EME_CALLBACK, (IMFMediaEngineEMENotify *)mediaEngineNotify))) {
+        Log("Failed to set MF_MEDIA_ENGINE_CALLBACK 0x%x", hr);
+        return hr;
+    }
+
     // Key notification callback
     if (FAILED(hr = attributes->SetUnknown(MF_MEDIA_ENGINE_NEEDKEY_CALLBACK, mediaEngineNeedKeyNotify))) {
         Log("Failed to set MF_MEDIA_ENGINE_NEEDKEY_CALLBACK 0x%x", hr);
@@ -155,28 +160,24 @@ HRESULT CreateProtectedPlaybackSession() {
         return hr;
     }
 
+    if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_COMPATIBILITY_MODE_WIN10))) {
+        Log("Failed to set MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE 0x%x", hr);
+        return hr;
+    }
+
     DWORD MEDIA_ENGINE_FLAGS = 0; //MF_MEDIA_ENGINE_REAL_TIME_MODE | MF_MEDIA_ENGINE_DISABLE_LOCAL_PLUGINS;
     if (FAILED(hr = factory->CreateInstance(MEDIA_ENGINE_FLAGS, attributes, &mediaEngine))) {
         Log("Failed to Create MediaEngine Instance 0x%x", hr);
         return hr;
     }
 
-    if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE_IE_EDGE))) {
-        Log("Failed to set MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE 0x%x", hr);
-        return hr;
-    }
-
     attributes->Release();
-
-    // Tears of steel DASH from Microsoft PlayReady test site.
-    const std::wstring streamManifestUrl = L"http://profficialsite.origin.mediaservices.windows.net/c51358ea-9a5e-4322-8951-897d640fdfd7/tearsofsteel_4k.ism/manifest(format=mpd-time-csf)";
-    const std::wstring laUrl = L"http://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150,playenablers:(786627D8-C2A6-44BE-8F88-08AE255B01A7,AE092501-A9E3-46F6-AFBE-628577DCDF55))";
-
+    
     // Query for the class factory that allows us to create media keys.
     //
     // https://docs.microsoft.com/en-us/windows/win32/api/mfmediaengine/nn-mfmediaengine-imfmediaengineclassfactory2
-    IMFMediaEngineClassFactory2 *keyFactory = nullptr;
-    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactory2), (void**)&keyFactory))) {
+    IMFMediaEngineClassFactory2 *keyFactory2 = nullptr;
+    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFMediaEngineClassFactory2), (void**)&keyFactory2))) {
         Log("Failed to query interface for IMFMediaEngineClassFactory2: %.2x", hr);
         return hr;
     }
@@ -187,9 +188,9 @@ HRESULT CreateProtectedPlaybackSession() {
     ZeroMemory((void *)cwd, CWD_BUFFER_LEN * sizeof(wchar_t));
     DWORD cwdLen = GetCurrentDirectoryW(CWD_BUFFER_LEN, (LPWSTR)cwd);
     std::wstring cwdCdmStore(cwd, std::wstring::traits_type::length(cwd));
-    cwdCdmStore.append(L"\\cdm");
+    cwdCdmStore.append(L"\\cdm_v1");
     std::wstring cwdPrivateCdmStores(cwd, cwdLen);
-    cwdPrivateCdmStores.append(L"\\cdm_private");
+    cwdPrivateCdmStores.append(L"\\cdm_private_v1");
 
     BSTR defaultCdmStorePath = SysAllocStringLen(cwdCdmStore.c_str(), cwdCdmStore.size());
     BSTR inprivateCdmStorePath = SysAllocStringLen(cwdPrivateCdmStores.c_str(), cwdPrivateCdmStores.size());
@@ -211,16 +212,13 @@ HRESULT CreateProtectedPlaybackSession() {
     // Create the key session with the given content decryption modules.
     BSTR keySystem = L"com.microsoft.playready";
     IMFMediaKeys *prKeys = nullptr;
-    if (FAILED(hr = keyFactory->CreateMediaKeys2(keySystem, defaultCdmStorePath, inprivateCdmStorePath, &prKeys))) {
+    if (FAILED(hr = keyFactory2->CreateMediaKeys2(keySystem, defaultCdmStorePath, inprivateCdmStorePath, &prKeys))) {
         Log("Failed to create media keys: 0x%X", hr);
         return hr;
     }
 
-    keyFactory->Release();
+    keyFactory2->Release();
 
-    BSTR url = SysAllocStringLen(streamManifestUrl.data(), streamManifestUrl.size());
-    hr = mediaEngine->SetSource(url);
-    SysReleaseString(url);
 
     if (FAILED(hr)) {
         Log("Failed to set media engine source %.2x", hr);
@@ -238,7 +236,12 @@ HRESULT CreateProtectedPlaybackSession() {
         Log("Failed to set media keys 0x%X", hr);
     }
 
-    mediaEngineEME->Release();
+    // Tears of steel DASH from Microsoft PlayReady test site.
+    const std::wstring streamManifestUrl = L"http://profficialsite.origin.mediaservices.windows.net/c51358ea-9a5e-4322-8951-897d640fdfd7/tearsofsteel_4k.ism/manifest(format=mpd-time-csf)";
+    const std::wstring laUrl = L"http://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:150,playenablers:(786627D8-C2A6-44BE-8F88-08AE255B01A7,AE092501-A9E3-46F6-AFBE-628577DCDF55))";
+    BSTR url = SysAllocStringLen(streamManifestUrl.data(), streamManifestUrl.size());
+    hr = mediaEngine->SetSource(url);
+    SysReleaseString(url);
 
     return S_OK;
 }
