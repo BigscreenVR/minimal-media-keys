@@ -332,3 +332,5 @@ ASALocalRun/
 # PlayReady cdm folders
 cdm/
 cdm_private/
+
+MFTraceLog/
