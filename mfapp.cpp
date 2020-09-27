@@ -133,6 +133,18 @@ HRESULT CreateProtectedPlaybackSession() {
         return hr;
     }
 
+    IMFAttributes *factoryAttributes;
+    if (FAILED(hr = factory->QueryInterface(__uuidof(IMFAttributes), (void**)&factoryAttributes)))
+    {
+        Log("Failed to query factory interface for IMFAttributes: %.2x", hr);
+        return hr;
+    }
+
+    if (FAILED(hr = factoryAttributes->SetGUID(MF_MEDIA_ENGINE_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_COMPATIBILITY_MODE_WIN10))) {
+        Log("Failed to set MF_MEDIA_ENGINE_COMPATIBILITY_MODE 0x%x", hr);
+        return hr;
+    }
+
     if (FAILED(hr = MFCreateAttributes(&attributes, 1))) {
         Log("MFCreateAttributes failed 0x%x", hr);
         return hr;
@@ -161,7 +173,7 @@ HRESULT CreateProtectedPlaybackSession() {
     }
 
     if (FAILED(hr = attributes->SetGUID(MF_MEDIA_ENGINE_COMPATIBILITY_MODE, MF_MEDIA_ENGINE_COMPATIBILITY_MODE_WIN10))) {
-        Log("Failed to set MF_MEDIA_ENGINE_BROWSER_COMPATIBILITY_MODE 0x%x", hr);
+        Log("Failed to set MF_MEDIA_ENGINE_COMPATIBILITY_MODE 0x%x", hr);
         return hr;
     }
 
